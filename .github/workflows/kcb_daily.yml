@@ -1,0 +1,46 @@
+name: kcb-daily
+
+on:
+  schedule:
+    - cron: "30 8 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Shanghai
+  OUT_DIR: data
+  RECENT_DAYS: "60"
+  PUSH_CHANGES: "false"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Fetch daily data
+        run: python kcb_daily.py --out-dir "${OUT_DIR}" --recent-days "${RECENT_DAYS}"
+      - name: Upload data
+        uses: actions/upload-artifact@v4
+        with:
+          name: kcb-data-${{ github.run_id }}
+          path: ${{ env.OUT_DIR }}
+          if-no-files-found: error
+      - name: Commit data
+        if: env.PUSH_CHANGES == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${OUT_DIR}"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: update kcb daily data"
+            git push
+          fi
