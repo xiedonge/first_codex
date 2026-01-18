@@ -41,7 +41,7 @@ FIELDS2_NAME_MAP = {
 
 DEFAULT_KLT = 101
 DEFAULT_FQT = 1
-DEFAULT_BEG = 0
+DEFAULT_BEG = 20100101
 DEFAULT_END = 20500101
 DEFAULT_LIMIT = 2000
 DEFAULT_SLEEP = 0.25
@@ -91,6 +91,7 @@ def fetch_star_list(
     page_size: int,
     sleep_s: float,
     max_stocks: Optional[int],
+    list_fs: str,
     retries: int,
     backoff: float,
     timeout: int,
@@ -103,22 +104,16 @@ def fetch_star_list(
         "np": 1,
         "fltt": 2,
         "invt": 2,
-        "fs": LIST_FS,
+        "fid": "f12",
+        "fs": list_fs,
         "fields": LIST_FIELDS,
     }
     if ut:
         params["ut"] = ut
 
-    payload = http_get_json(session, LIST_URL, params, retries, backoff, timeout)
-    if not payload or not isinstance(payload, dict):
-        raise RuntimeError("failed to fetch stock list")
-
-    data = payload.get("data") or {}
-    diff = data.get("diff") or []
-    total = data.get("total") or len(diff)
-    pages = max(1, int(math.ceil(total / page_size)))
-
     items: List[Dict[str, str]] = []
+    total_pages = None
+    page = 1
 
     def append_items(rows: Iterable[Dict[str, object]]) -> bool:
         for row in rows:
@@ -139,22 +134,31 @@ def fetch_star_list(
                 return True
         return False
 
-    append_items(diff)
-
-    for page in range(2, pages + 1):
-        if max_stocks and len(items) >= max_stocks:
-            break
+    while True:
         params["pn"] = page
         payload = http_get_json(
             session, LIST_URL, params, retries, backoff, timeout
         )
-        if not payload:
-            continue
+        if not payload or not isinstance(payload, dict):
+            if page == 1:
+                raise RuntimeError("failed to fetch stock list")
+            break
         data = payload.get("data") or {}
         diff = data.get("diff") or []
+        if page == 1:
+            total = data.get("total")
+            if isinstance(total, int) and total > 0:
+                total_pages = max(1, int(math.ceil(total / page_size)))
+        if not diff:
+            break
         stop = append_items(diff)
         if stop:
             break
+        if total_pages and page >= total_pages:
+            break
+        if not total_pages and len(diff) < page_size:
+            break
+        page += 1
         time.sleep(sleep_s)
 
     return items
@@ -294,6 +298,11 @@ def main() -> int:
     parser.add_argument(
         "--max-stocks", type=int, default=None, help="Limit number of stocks."
     )
+    parser.add_argument(
+        "--list-fs",
+        default=LIST_FS,
+        help="Stock list filter for Eastmoney clist/get.",
+    )
     parser.add_argument("--klt", type=int, default=DEFAULT_KLT)
     parser.add_argument("--fqt", type=int, default=DEFAULT_FQT)
     parser.add_argument("--beg", type=int, default=DEFAULT_BEG)
@@ -338,6 +347,7 @@ def main() -> int:
             page_size=200,
             sleep_s=args.sleep,
             max_stocks=args.max_stocks,
+            list_fs=args.list_fs,
             retries=args.retries,
             backoff=args.backoff,
             timeout=args.timeout,
