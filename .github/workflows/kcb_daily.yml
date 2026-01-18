@@ -12,7 +12,7 @@ env:
   TZ: Asia/Shanghai
   OUT_DIR: data
   RECENT_DAYS: "60"
-  PUSH_CHANGES: "false"
+  PUSH_CHANGES: "true"
 
 jobs:
   fetch:
