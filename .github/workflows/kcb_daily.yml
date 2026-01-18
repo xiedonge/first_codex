@@ -11,8 +11,9 @@ permissions:
 env:
   TZ: Asia/Shanghai
   OUT_DIR: data
-  RECENT_DAYS: "60"
+  RECENT_DAYS: "0"
   PUSH_CHANGES: "true"
+  FULL_REBUILD: "true"
 
 jobs:
   fetch:
@@ -25,7 +26,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Fetch daily data
-        run: python kcb_daily.py --out-dir "${OUT_DIR}" --recent-days "${RECENT_DAYS}"
+        run: |
+          args="--out-dir ${OUT_DIR} --recent-days ${RECENT_DAYS}"
+          if [ "${FULL_REBUILD}" = "true" ]; then
+            args="$args --overwrite"
+          fi
+          python kcb_daily.py $args
       - name: Upload data
         uses: actions/upload-artifact@v4
         with:
