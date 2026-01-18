@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "30 8 * * 1-5"
   workflow_dispatch:
+    inputs:
+      full_rebuild:
+        description: "Run full rebuild (overwrite all data)"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -11,9 +16,7 @@ permissions:
 env:
   TZ: Asia/Shanghai
   OUT_DIR: data
-  RECENT_DAYS: "0"
   PUSH_CHANGES: "true"
-  FULL_REBUILD: "true"
 
 jobs:
   fetch:
@@ -25,13 +28,12 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Fetch daily data
-        run: |
-          args="--out-dir ${OUT_DIR} --recent-days ${RECENT_DAYS}"
-          if [ "${FULL_REBUILD}" = "true" ]; then
-            args="$args --overwrite"
-          fi
-          python kcb_daily.py $args
+      - name: Full rebuild
+        if: github.event_name == 'workflow_dispatch' && inputs.full_rebuild == 'true'
+        run: python kcb_daily.py --out-dir "${OUT_DIR}" --overwrite --recent-days 0
+      - name: Incremental update
+        if: github.event_name != 'workflow_dispatch' || inputs.full_rebuild != 'true'
+        run: python kcb_daily_incremental.py --out-dir "${OUT_DIR}"
       - name: Upload data
         uses: actions/upload-artifact@v4
         with:
