@@ -34,6 +34,9 @@ jobs:
       - name: Incremental update
         if: github.event_name != 'workflow_dispatch' || inputs.full_rebuild != 'true'
         run: python kcb_daily_incremental.py --out-dir "${OUT_DIR}"
+      - name: Run MA120 signal scan
+        if: github.event_name != 'workflow_dispatch' || inputs.full_rebuild != 'true'
+        run: python kcb_signal_ma120.py --data-dir "${OUT_DIR}/daily" --out "${OUT_DIR}/signals_ma120.csv"
       - name: Upload data
         uses: actions/upload-artifact@v4
         with:
