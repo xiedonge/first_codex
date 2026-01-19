@@ -1,0 +1,45 @@
+name: kcb-signal-ma20-ma30
+
+on:
+  schedule:
+    - cron: "10 9 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Shanghai
+  OUT_DIR: data
+  PUSH_CHANGES: "true"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run MA20/MA30 signal scan
+        run: python kcb_signal_ma20_ma30.py --data-dir "${OUT_DIR}/daily" --out "${OUT_DIR}/signals_ma20_ma30.csv"
+      - name: Upload signals
+        uses: actions/upload-artifact@v4
+        with:
+          name: kcb-signals-ma20-ma30-${{ github.run_id }}
+          path: ${{ env.OUT_DIR }}/signals_ma20_ma30.csv
+          if-no-files-found: error
+      - name: Commit signals
+        if: env.PUSH_CHANGES == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${OUT_DIR}/signals_ma20_ma30.csv"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: update MA20/MA30 signals"
+            git push
+          fi
