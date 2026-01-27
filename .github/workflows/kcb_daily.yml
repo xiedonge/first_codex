@@ -3,7 +3,6 @@ name: kcb-daily
 on:
   schedule:
     - cron: "30 8 * * 1-5"
-    - cron: "0 12 * * 1-5"
   workflow_dispatch:
     inputs:
       full_rebuild:
